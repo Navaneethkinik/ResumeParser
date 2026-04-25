@@ -4,7 +4,9 @@ export interface ResumeData {
     email?: string;
     phone?: string;
     linkedin?: string;
+    github?: string;
     location?: string;
+    website?: string;
   };
   experience: Array<{
     company: string;
@@ -51,6 +53,14 @@ export interface BatchResponse {
   results: BatchResult[];
 }
 
+export interface JobResponse {
+  status: 'processing' | 'completed' | 'failed' | 'PENDING' | 'SUCCESS' | 'FAILURE';
+  job_id: string;
+  results?: BatchResult[];
+  error?: string;
+  message?: string;
+}
+
 export const api = {
   parseResume: async (file: File, provider?: string, model?: string): Promise<ParseResponse> => {
     const formData = new FormData();
@@ -78,7 +88,7 @@ export const api = {
     return response.json();
   },
 
-  parseBatch: async (files: File[], provider?: string, model?: string): Promise<BatchResponse> => {
+  parseBatch: async (files: File[], provider?: string, model?: string): Promise<JobResponse> => {
     const formData = new FormData();
     files.forEach(file => formData.append('files', file));
 
@@ -98,9 +108,17 @@ export const api = {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
-      throw new Error(errorData?.detail || 'Failed to parse batch');
+      throw new Error(errorData?.detail || 'Failed to start batch processing');
     }
 
+    return response.json();
+  },
+
+  checkBatchStatus: async (jobId: string): Promise<JobResponse> => {
+    const response = await fetch(`/api/v1/batch/${jobId}`);
+    if (!response.ok) {
+      throw new Error('Failed to check job status');
+    }
     return response.json();
   }
 };

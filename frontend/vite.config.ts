@@ -6,6 +6,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    host: true,
+    hmr: {
+      clientPort: 3000
+    },
+    watch: {
+      usePolling: true
+    },
     proxy: {
       '/api': {
         target: process.env.VITE_API_TARGET || 'http://127.0.0.1:5000',

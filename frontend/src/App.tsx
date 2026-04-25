@@ -62,13 +62,34 @@ export default function App() {
       if (files.length === 1) {
         const res = await api.parseResume(files[0], provider || undefined, model || undefined);
         setSingleResult(res.data);
+        setIsLoading(false);
       } else {
-        const res = await api.parseBatch(files, provider || undefined, model || undefined);
-        setBatchResults(res.results);
+        const initialRes = await api.parseBatch(files, provider || undefined, model || undefined);
+        const jobId = initialRes.job_id;
+        
+        // Polling logic
+        const poll = async () => {
+          try {
+            const statusRes = await api.checkBatchStatus(jobId);
+            if (statusRes.status === 'completed' || statusRes.status === 'SUCCESS') {
+              setBatchResults(statusRes.results || []);
+              setIsLoading(false);
+            } else if (statusRes.status === 'failed' || statusRes.status === 'FAILURE') {
+              throw new Error(statusRes.error || 'Batch processing failed');
+            } else {
+              // Still processing, poll again in 1s
+              setTimeout(poll, 1000);
+            }
+          } catch (err: any) {
+            setError(err.message);
+            setIsLoading(false);
+          }
+        };
+        
+        poll();
       }
     } catch (err: any) {
-      setError(err.message || "An error occurred during processing.");
-    } finally {
+      setError(err.message);
       setIsLoading(false);
     }
   };
@@ -125,6 +146,7 @@ export default function App() {
               <select 
                 value={provider} 
                 onChange={(e) => setProvider(e.target.value)}
+                title="Select which AI provider to use for parsing (overrides your environment settings)"
                 style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', color: 'white', outline: 'none' }}
               >
                 <option value="">Default (Settings)</option>
@@ -138,6 +160,7 @@ export default function App() {
               <input 
                 type="text" 
                 placeholder="e.g. gemini-1.5-flash"
+                title="Enter a specific model ID (e.g., gemini-1.5-pro) to override the default"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
                 style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', color: 'white', outline: 'none' }}
@@ -156,6 +179,7 @@ export default function App() {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
+            title="Click to select files from your computer, or drag and drop them here"
             style={{ 
               textAlign: 'center', 
               border: isDragging ? '2px dashed var(--accent-1)' : '2px dashed var(--glass-border)',
@@ -190,7 +214,11 @@ export default function App() {
                     <div key={i} className="animate-fade-in" style={{ background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '12px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid var(--glass-border)' }}>
                       <File size={14} color="var(--text-secondary)" /> 
                       <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                      <button onClick={() => removeFile(i)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}>
+                      <button 
+                        onClick={() => removeFile(i)} 
+                        title="Remove this file"
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}
+                      >
                         <X size={14} />
                       </button>
                     </div>
@@ -210,6 +238,7 @@ export default function App() {
                       color: 'var(--accent-1)',
                       cursor: 'pointer'
                     }}
+                    title="Add more resumes to the batch"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Plus size={14} /> Add more
@@ -224,6 +253,7 @@ export default function App() {
                   className="btn btn-primary animate-fade-in" 
                   onClick={(e) => { e.stopPropagation(); handleProcess(); }}
                   disabled={isLoading}
+                  title={isLoading ? "Processing files..." : "Upload and analyze all selected resumes"}
                   style={{ padding: '1rem 4rem', fontSize: '1.1rem', borderRadius: '12px' }}
                 >
                   {isLoading ? <><Loader2 className="animate-spin" /> Processing...</> : 'Start AI Analysis'}
@@ -256,12 +286,17 @@ export default function App() {
                   <Database color="var(--accent-2)" /> Extraction Results
                 </h2>                <div style={{ display: 'flex', gap: '0.5rem' }}>
                   {selectedBatchResult && (
-                    <button className="btn" onClick={() => setSelectedBatchResult(null)}>
+                    <button 
+                      className="btn" 
+                      onClick={() => setSelectedBatchResult(null)}
+                      title="Return to the list of all processed resumes"
+                    >
                       Back to List
                     </button>
                   )}
                   <button 
                     className="btn"
+                    title="Download the full extraction data as a JSON file"
                     onClick={() => downloadJson(selectedBatchResult || (batchResults.length > 0 ? batchResults : singleResult), `resume_data_${Date.now()}.json`)}
                   >
                     <Download size={18} /> Export JSON
@@ -284,23 +319,43 @@ export default function App() {
                 {/* Visual View (Right Column) */}
                 <div className="animate-fade-in">
                   {/* Detailed Visual View (Used for single parse OR when a batch item is selected) */}
-                  {(singleResult || selectedBatchResult) && (
-                    <div style={{ display: 'grid', gap: '1.5rem' }}>
-                      {/* Candidate Name & Contact Info Card */}
-                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                        <h1 style={{ margin: '0 0 1.5rem 0', fontSize: '1.8rem', color: 'var(--accent-1)' }}>{(selectedBatchResult || singleResult)?.name}</h1>
-                        <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Contact Information</h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                          {Object.entries((selectedBatchResult || singleResult)?.contact || {}).map(([key, val]) => (
-                            val && (
-                              <div key={key}>
-                                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.25rem 0', textTransform: 'capitalize' }}>{key}</p>
-                                <p style={{ margin: 0, fontWeight: 500, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>{val}</p>
-                              </div>
-                            )
-                          ))}
+                  {(singleResult || selectedBatchResult) && (() => {
+                    const currentResult = selectedBatchResult || singleResult;
+                    if (!currentResult) return null;
+
+                    return (
+                      <div style={{ display: 'grid', gap: '1.5rem' }}>
+                        {/* Candidate Name & Contact Info Card */}
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                          <h1 style={{ margin: '0 0 1.5rem 0', fontSize: '1.8rem', color: 'var(--accent-1)' }}>{currentResult.name || 'Anonymous'}</h1>
+                          <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Contact Information</h3>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            {(() => {
+                              const c = currentResult.contact || {};
+                              const linkKeys = ['linkedin', 'github', 'website'];
+                              const labelMap: Record<string, string> = { linkedin: 'LinkedIn', github: 'GitHub', website: 'Website', email: 'Email', phone: 'Phone', location: 'Location' };
+                              return (Object.entries(c) as [string, string][])
+                                .filter(([, v]) => !!v)
+                                .map(([key, val]) => (
+                                  <div key={key}>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.25rem 0' }}>{labelMap[key] || key}</p>
+                                    {linkKeys.includes(key) ? (
+                                      <a
+                                        href={val.startsWith('http') ? val : `https://${val}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{ margin: 0, fontWeight: 500, fontSize: '0.85rem', color: 'var(--accent-1)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}
+                                      >
+                                        {val}
+                                      </a>
+                                    ) : (
+                                      <p style={{ margin: 0, fontWeight: 500, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>{val}</p>
+                                    )}
+                                  </div>
+                                ));
+                            })()}
+                          </div>
                         </div>
-                      </div>
 
                       {/* Experience */}
                       <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
@@ -308,12 +363,12 @@ export default function App() {
                           <Briefcase size={14} /> Experience
                         </h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                          {(selectedBatchResult || singleResult)?.experience && (selectedBatchResult || singleResult)!.experience.length > 0 ? (
-                            (selectedBatchResult || singleResult)!.experience.map((exp, i) => (
+                          {Array.isArray(currentResult.experience) && currentResult.experience.length > 0 ? (
+                            currentResult.experience.map((exp, i) => (
                               <div key={i}>
                                 <p style={{ margin: 0, fontWeight: 600, color: 'var(--accent-1)', fontSize: '0.95rem' }}>{exp.title}</p>
-                                <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}>{exp.company} • <span style={{ color: 'var(--text-secondary)' }}>{exp.start_date} - {exp.end_date}</span></p>
-                                {exp.description && exp.description.length > 0 && (
+                                <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}>{exp.company} • <span style={{ color: 'var(--text-secondary)' }}>{exp.start_date || 'N/A'} - {exp.end_date || 'Present'}</span></p>
+                                {Array.isArray(exp.description) && exp.description.length > 0 && (
                                   <ul style={{ margin: '0.4rem 0 0 0', paddingLeft: '1.2rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                                     {exp.description.map((desc, di) => <li key={di}>{desc}</li>)}
                                   </ul>
@@ -330,7 +385,7 @@ export default function App() {
                           <GraduationCap size={14} /> Education
                         </h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                          {(selectedBatchResult || singleResult)?.education?.map((edu, i) => (
+                          {Array.isArray(currentResult.education) && currentResult.education.map((edu, i) => (
                             <div key={i}>
                               <p style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem' }}>{edu.degree || 'Degree'}</p>
                               <p style={{ margin: '0.2rem 0', fontSize: '0.85rem', color: 'var(--accent-2)' }}>{edu.institution}</p>
@@ -342,42 +397,43 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Skills */}
-                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                        <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Skills</h3>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                          {(selectedBatchResult || singleResult)?.skills?.map((skill, i) => (
-                            <span key={i} style={{ background: 'var(--bg-primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', border: '1px solid var(--glass-border)' }}>
-                              {skill}
-                            </span>
-                          ))}
+                        {/* Skills */}
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                          <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Skills</h3>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                            {Array.isArray(currentResult.skills) && currentResult.skills.map((skill, i) => (
+                              <span key={i} style={{ background: 'var(--bg-primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', border: '1px solid var(--glass-border)' }}>
+                                {skill}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Projects */}
-                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                        <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Projects</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                          {(selectedBatchResult || singleResult)?.projects?.map((proj, i) => (
-                            <div key={i}>
-                              <p style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem', color: 'var(--accent-1)' }}>{proj.name}</p>
-                              <p style={{ margin: '0.25rem 0', fontSize: '0.8rem' }}>{proj.description}</p>
-                            </div>
-                          ))}
+                        {/* Projects */}
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                          <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Projects</h3>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            {Array.isArray(currentResult.projects) && currentResult.projects.map((proj: any, i) => (
+                              <div key={i}>
+                                <p style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem', color: 'var(--accent-1)' }}>{typeof proj === 'object' ? proj.name : String(proj)}</p>
+                                {typeof proj === 'object' && proj.description && <p style={{ margin: '0.25rem 0', fontSize: '0.8rem' }}>{proj.description}</p>}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Certifications */}
-                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                        <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Certifications</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          {(selectedBatchResult || singleResult)?.certifications?.map((cert, i) => (
-                            <p key={i} style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>• {cert}</p>
-                          ))}
+                        {/* Certifications */}
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                          <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Certifications</h3>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            {Array.isArray(currentResult.certifications) && currentResult.certifications.map((cert, i) => (
+                              <p key={i} style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>• {cert}</p>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Batch Result List View (Shown when multiple files processed and NO single result is selected) */}
                   {batchResults.length > 0 && !selectedBatchResult && (
@@ -396,6 +452,7 @@ export default function App() {
                               <button 
                                 className="btn" 
                                 style={{ padding: '0.4rem', borderRadius: '8px' }}
+                                title="View detailed analysis for this resume"
                                 onClick={() => setSelectedBatchResult(res.data || null)}
                               >
                                 <Eye size={16} />
@@ -404,6 +461,7 @@ export default function App() {
                             <button 
                               className="btn" 
                               style={{ padding: '0.4rem', borderRadius: '8px' }}
+                              title="Download JSON for this resume"
                               onClick={() => downloadJson(res.data, `${res.filename}.json`)}
                             >
                               <Download size={16} />

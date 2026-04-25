@@ -1,0 +1,152 @@
+{
+	"info": {
+		"_postman_id": "c6a2e2b3-762d-4d7a-8f7c-5f4a1c2d3b4e",
+		"name": "Resume Parser API",
+		"description": "API collection for the AI-Powered Resume Parser. Supports single and batch resume processing with Gemini/Groq.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Single Resume",
+			"item": [
+				{
+					"name": "Parse Single Resume",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": [],
+									"description": "Select a resume file (.pdf, .docx, .txt)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/parse-resume?provider=gemini&model=gemini-1.5-flash",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"parse-resume"
+							],
+							"query": [
+								{
+									"key": "provider",
+									"value": "gemini",
+									"description": "Optional: gemini or groq"
+								},
+								{
+									"key": "model",
+									"value": "gemini-1.5-flash",
+									"description": "Optional: override specific model ID"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Batch Processing",
+			"item": [
+				{
+					"name": "Upload Batch",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "files",
+									"type": "file",
+									"src": [],
+									"description": "Select multiple resume files"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/parse-batch?provider=groq",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"parse-batch"
+							],
+							"query": [
+								{
+									"key": "provider",
+									"value": "groq"
+								}
+							]
+						},
+						"description": "Returns a job_id immediately. Use the 'Get Batch Status' request to poll for results."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Batch Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/batch/:job_id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"batch",
+								":job_id"
+							],
+							"variable": [
+								{
+									"key": "job_id",
+									"value": "your-job-id-here"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000",
+			"type": "string"
+		}
+	]
+}

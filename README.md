@@ -13,9 +13,12 @@ A robust, high-performance resume parsing application that uses state-of-the-art
     - Automatic identification of contact details, education, and professional experience.
     - Skill extraction and categorization.
     - Project and certification tracking.
+- **Strict Data Enforcement**: Multi-layer defense system (Prompt Engineering + Custom Normalizer + Pydantic `extra='ignore'`) ensures zero application crashes from unpredictable AI responses.
+- **Error Boundaries**: A React Error Boundary implementation to ensure a smooth user experience even if data rendering fails.
 - **Responsive Design**: Fully compatible with mobile, tablet, and desktop devices.
 - **Efficient Caching**: Uses Redis to cache extraction results, preventing redundant LLM calls and reducing costs.
-- **Async Processing**: Leverages Celery and Redis for reliable background processing of large batches.
+- **Async Processing**: Leverages Celery and Redis with `asyncio.gather` for reliable, concurrent background processing of large batches.
+- **Dynamic Model Overrides**: Test different models and providers directly from the UI without changing backend configurations.
 
 ## 🛠️ Tech Stack
 
@@ -43,12 +46,11 @@ The easiest way to get started is using Docker Compose.
    ```
 
 2. **Configure Environment**:
-   Create a `.env` file in the root directory:
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key
-   GROQ_API_KEY=your_groq_api_key
-   MODEL_PROVIDER=gemini # or groq
+   Copy the example environment file and fill in your API keys:
+   ```bash
+   cp .env.example .env
    ```
+   (Open `.env` and add your `GEMINI_API_KEY` and/or `GROQ_API_KEY`)
 
 3. **Launch the application**:
    ```bash
@@ -86,19 +88,28 @@ npm install
 npm run dev
 ```
 
+## 🧪 Postman Collection
+
+A complete Postman collection is included to easily test the API endpoints (Single Upload, Batch Upload, and Status Polling).
+1. Open Postman.
+2. Click **Import**.
+3. Select `postman/ResumeParser.postman_collection.json` from this repository.
+
 ## 📂 Project Structure
 
 ```text
 ├── app.py                # FastAPI entry point
 ├── routes/               # API endpoints (resume, health)
-├── services/             # Core logic (LLM routing, parsing)
-├── models/               # Pydantic schemas
-├── workers/              # Celery worker configuration
+├── services/             # Core logic (LLM routing, parsing, normalizer)
+├── models/               # Strict Pydantic schemas
+├── workers/              # Celery worker configuration (asyncio.gather)
 ├── utils/                # Helpers (caching, logging, file extraction)
-├── prompts/              # LLM prompt templates
+├── prompts/              # Strict LLM prompt templates
+├── postman/              # Postman collection for API testing
 ├── frontend/             # React application
 │   ├── src/
 │   │   ├── services/     # API client
+│   │   ├── ErrorBoundary.tsx # React crash protection
 │   │   └── App.tsx       # Main UI component
 └── docker-compose.yml    # Container orchestration
 ```
