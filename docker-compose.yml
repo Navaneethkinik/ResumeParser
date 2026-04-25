@@ -7,6 +7,8 @@ services:
       - "3000:3000"
     networks:
       - resume-network
+    environment:
+      - VITE_API_TARGET=http://api:5000
     depends_on:
       - api
 
