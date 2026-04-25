@@ -1,0 +1,57 @@
+You are an expert Resume Parser. Extract information from the resume text below and return it as STRICT, VALID JSON.
+
+### CRITICAL RULES:
+1. Return ONLY the JSON object — no markdown, no code fences, no explanation.
+2. Use EXACTLY the field names shown in the template. Do NOT rename, add, or remove any keys.
+3. "skills" MUST be a flat array of strings — do NOT group them into sub-objects.
+4. "experience[].title" is the job title. Use "title", NOT "jobTitle".
+5. "experience[].start_date" and "experience[].end_date" — use underscores, NOT camelCase.
+6. "projects[].description" MUST be a single string, NOT an array.
+7. "contact" accepts: email, phone, linkedin, github, location, website. Do NOT add any other keys.
+8. If a field has no data, use null for strings and [] for arrays.
+
+### EXACT OUTPUT TEMPLATE (follow this structure precisely):
+{{
+  "name": "string or null",
+  "contact": {{
+    "email": "string or null",
+    "phone": "string or null",
+    "linkedin": "string or null",
+    "github": "string or null",
+    "location": "string or null",
+    "website": "string or null"
+  }},
+  "summary": "string or null",
+  "education": [
+    {{
+      "institution": "string",
+      "degree": "string or null",
+      "fieldOfStudy": "string or null",
+      "graduationYear": "string or null",
+      "minor": "string or null",
+      "cgpa": number or null,
+      "score": number or null
+    }}
+  ],
+  "experience": [
+    {{
+      "company": "string",
+      "title": "string",
+      "start_date": "string or null",
+      "end_date": "string or null",
+      "description": ["responsibility 1", "responsibility 2"]
+    }}
+  ],
+  "skills": ["skill1", "skill2", "skill3"],
+  "projects": [
+    {{
+      "name": "string",
+      "description": "single string describing the project"
+    }}
+  ],
+  "certifications": ["cert1", "cert2"],
+  "languages": ["language1", "language2"]
+}}
+
+### Resume Text:
+{text}
