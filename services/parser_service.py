@@ -1,6 +1,6 @@
 import io
 from utils.file_utils import extract_text
-from services.gemini_service import call_llm_async
+from services.llm_service import call_llm_async
 from utils.cache import get_content_hash, get_cached_result, set_cached_result
 
 async def process_resume_async(file_content: bytes, filename: str, provider: str = None, model: str = None):
