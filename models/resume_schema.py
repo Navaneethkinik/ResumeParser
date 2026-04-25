@@ -1,13 +1,17 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 
 class ContactInfo(BaseModel):
+    model_config = ConfigDict(extra='ignore')
     email: Optional[str] = None
     phone: Optional[str] = None
     linkedin: Optional[str] = None
+    github: Optional[str] = None
     location: Optional[str] = None
+    website: Optional[str] = None
 
 class Experience(BaseModel):
+    model_config = ConfigDict(extra='ignore')
     company: str
     title: str
     start_date: Optional[str] = None
@@ -15,6 +19,7 @@ class Experience(BaseModel):
     description: List[str] = Field(default_factory=list)
 
 class Education(BaseModel):
+    model_config = ConfigDict(extra='ignore')
     institution: str
     degree: Optional[str] = None
     fieldOfStudy: Optional[str] = None
@@ -24,11 +29,12 @@ class Education(BaseModel):
     score: Optional[float] = None
 
 class Project(BaseModel):
+    model_config = ConfigDict(extra='ignore')
     name: str
-    description: str
-    skills: List[str] = Field(default_factory=list)
+    description: str = ""
 
 class ResumeData(BaseModel):
+    model_config = ConfigDict(extra='ignore')
     name: Optional[str] = None
     contact: ContactInfo = Field(default_factory=ContactInfo)
     summary: Optional[str] = None

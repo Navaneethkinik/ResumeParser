@@ -61,9 +61,11 @@ async def _call_gemini(prompt: str, model: str):
             "temperature": 0.1,
         },
     )
-    if response.parsed:
-        return response.parsed
-    return json.loads(response.text)
+    raw = response.parsed if response.parsed else json.loads(response.text)
+    # Validate + strip extra keys via Pydantic
+    if isinstance(raw, dict):
+        return ResumeData.model_validate(raw).model_dump()
+    return raw.model_dump() if hasattr(raw, 'model_dump') else raw
 
 
 # ─── Groq ──────────────────────────────────────────────────────────────────────
@@ -85,4 +87,6 @@ async def _call_groq(prompt: str, model: str):
         temperature=0.1,
     )
     content = response.choices[0].message.content
-    return json.loads(content)
+    raw = json.loads(content)
+    # Validate against schema + strip extra keys
+    return ResumeData.model_validate(raw).model_dump()

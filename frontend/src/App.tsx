@@ -62,13 +62,34 @@ export default function App() {
       if (files.length === 1) {
         const res = await api.parseResume(files[0], provider || undefined, model || undefined);
         setSingleResult(res.data);
+        setIsLoading(false);
       } else {
-        const res = await api.parseBatch(files, provider || undefined, model || undefined);
-        setBatchResults(res.results);
+        const initialRes = await api.parseBatch(files, provider || undefined, model || undefined);
+        const jobId = initialRes.job_id;
+        
+        // Polling logic
+        const poll = async () => {
+          try {
+            const statusRes = await api.checkBatchStatus(jobId);
+            if (statusRes.status === 'completed' || statusRes.status === 'SUCCESS') {
+              setBatchResults(statusRes.results || []);
+              setIsLoading(false);
+            } else if (statusRes.status === 'failed' || statusRes.status === 'FAILURE') {
+              throw new Error(statusRes.error || 'Batch processing failed');
+            } else {
+              // Still processing, poll again in 1s
+              setTimeout(poll, 1000);
+            }
+          } catch (err: any) {
+            setError(err.message);
+            setIsLoading(false);
+          }
+        };
+        
+        poll();
       }
     } catch (err: any) {
-      setError(err.message || "An error occurred during processing.");
-    } finally {
+      setError(err.message);
       setIsLoading(false);
     }
   };
@@ -284,23 +305,43 @@ export default function App() {
                 {/* Visual View (Right Column) */}
                 <div className="animate-fade-in">
                   {/* Detailed Visual View (Used for single parse OR when a batch item is selected) */}
-                  {(singleResult || selectedBatchResult) && (
-                    <div style={{ display: 'grid', gap: '1.5rem' }}>
-                      {/* Candidate Name & Contact Info Card */}
-                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                        <h1 style={{ margin: '0 0 1.5rem 0', fontSize: '1.8rem', color: 'var(--accent-1)' }}>{(selectedBatchResult || singleResult)?.name}</h1>
-                        <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Contact Information</h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                          {Object.entries((selectedBatchResult || singleResult)?.contact || {}).map(([key, val]) => (
-                            val && (
-                              <div key={key}>
-                                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.25rem 0', textTransform: 'capitalize' }}>{key}</p>
-                                <p style={{ margin: 0, fontWeight: 500, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>{val}</p>
-                              </div>
-                            )
-                          ))}
+                  {(singleResult || selectedBatchResult) && (() => {
+                    const currentResult = selectedBatchResult || singleResult;
+                    if (!currentResult) return null;
+
+                    return (
+                      <div style={{ display: 'grid', gap: '1.5rem' }}>
+                        {/* Candidate Name & Contact Info Card */}
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                          <h1 style={{ margin: '0 0 1.5rem 0', fontSize: '1.8rem', color: 'var(--accent-1)' }}>{currentResult.name || 'Anonymous'}</h1>
+                          <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Contact Information</h3>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            {(() => {
+                              const c = currentResult.contact || {};
+                              const linkKeys = ['linkedin', 'github', 'website'];
+                              const labelMap: Record<string, string> = { linkedin: 'LinkedIn', github: 'GitHub', website: 'Website', email: 'Email', phone: 'Phone', location: 'Location' };
+                              return (Object.entries(c) as [string, string][])
+                                .filter(([, v]) => !!v)
+                                .map(([key, val]) => (
+                                  <div key={key}>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.25rem 0' }}>{labelMap[key] || key}</p>
+                                    {linkKeys.includes(key) ? (
+                                      <a
+                                        href={val.startsWith('http') ? val : `https://${val}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{ margin: 0, fontWeight: 500, fontSize: '0.85rem', color: 'var(--accent-1)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}
+                                      >
+                                        {val}
+                                      </a>
+                                    ) : (
+                                      <p style={{ margin: 0, fontWeight: 500, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>{val}</p>
+                                    )}
+                                  </div>
+                                ));
+                            })()}
+                          </div>
                         </div>
-                      </div>
 
                       {/* Experience */}
                       <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
@@ -308,12 +349,12 @@ export default function App() {
                           <Briefcase size={14} /> Experience
                         </h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                          {(selectedBatchResult || singleResult)?.experience && (selectedBatchResult || singleResult)!.experience.length > 0 ? (
-                            (selectedBatchResult || singleResult)!.experience.map((exp, i) => (
+                          {Array.isArray(currentResult.experience) && currentResult.experience.length > 0 ? (
+                            currentResult.experience.map((exp, i) => (
                               <div key={i}>
                                 <p style={{ margin: 0, fontWeight: 600, color: 'var(--accent-1)', fontSize: '0.95rem' }}>{exp.title}</p>
-                                <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}>{exp.company} • <span style={{ color: 'var(--text-secondary)' }}>{exp.start_date} - {exp.end_date}</span></p>
-                                {exp.description && exp.description.length > 0 && (
+                                <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}>{exp.company} • <span style={{ color: 'var(--text-secondary)' }}>{exp.start_date || 'N/A'} - {exp.end_date || 'Present'}</span></p>
+                                {Array.isArray(exp.description) && exp.description.length > 0 && (
                                   <ul style={{ margin: '0.4rem 0 0 0', paddingLeft: '1.2rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                                     {exp.description.map((desc, di) => <li key={di}>{desc}</li>)}
                                   </ul>
@@ -330,7 +371,7 @@ export default function App() {
                           <GraduationCap size={14} /> Education
                         </h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                          {(selectedBatchResult || singleResult)?.education?.map((edu, i) => (
+                          {Array.isArray(currentResult.education) && currentResult.education.map((edu, i) => (
                             <div key={i}>
                               <p style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem' }}>{edu.degree || 'Degree'}</p>
                               <p style={{ margin: '0.2rem 0', fontSize: '0.85rem', color: 'var(--accent-2)' }}>{edu.institution}</p>
@@ -342,42 +383,43 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Skills */}
-                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                        <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Skills</h3>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                          {(selectedBatchResult || singleResult)?.skills?.map((skill, i) => (
-                            <span key={i} style={{ background: 'var(--bg-primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', border: '1px solid var(--glass-border)' }}>
-                              {skill}
-                            </span>
-                          ))}
+                        {/* Skills */}
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                          <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Skills</h3>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                            {Array.isArray(currentResult.skills) && currentResult.skills.map((skill, i) => (
+                              <span key={i} style={{ background: 'var(--bg-primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', border: '1px solid var(--glass-border)' }}>
+                                {skill}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Projects */}
-                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                        <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Projects</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                          {(selectedBatchResult || singleResult)?.projects?.map((proj, i) => (
-                            <div key={i}>
-                              <p style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem', color: 'var(--accent-1)' }}>{proj.name}</p>
-                              <p style={{ margin: '0.25rem 0', fontSize: '0.8rem' }}>{proj.description}</p>
-                            </div>
-                          ))}
+                        {/* Projects */}
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                          <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Projects</h3>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            {Array.isArray(currentResult.projects) && currentResult.projects.map((proj: any, i) => (
+                              <div key={i}>
+                                <p style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem', color: 'var(--accent-1)' }}>{typeof proj === 'object' ? proj.name : String(proj)}</p>
+                                {typeof proj === 'object' && proj.description && <p style={{ margin: '0.25rem 0', fontSize: '0.8rem' }}>{proj.description}</p>}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Certifications */}
-                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-                        <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Certifications</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          {(selectedBatchResult || singleResult)?.certifications?.map((cert, i) => (
-                            <p key={i} style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>• {cert}</p>
-                          ))}
+                        {/* Certifications */}
+                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                          <h3 style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Certifications</h3>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            {Array.isArray(currentResult.certifications) && currentResult.certifications.map((cert, i) => (
+                              <p key={i} style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>• {cert}</p>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Batch Result List View (Shown when multiple files processed and NO single result is selected) */}
                   {batchResults.length > 0 && !selectedBatchResult && (
