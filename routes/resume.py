@@ -1,17 +1,40 @@
-from flask import Blueprint, request, jsonify
-from services.parser_service import process_resume
+from fastapi import APIRouter, File, UploadFile, HTTPException, Query
+from services.parser_service import process_resume_async
+from typing import List, Optional
+from config.settings import settings
 
-resume_bp = Blueprint("resume", __name__)
+router = APIRouter(prefix="/api/v1", tags=["resume"])
 
-@resume_bp.route("/parse-resume", methods=["POST"])
-def parse_resume():
-    if "file" not in request.files:
-        return jsonify({"error": "No file provided"}), 400
+@router.post("/parse-resume")
+async def parse_resume(
+    file: UploadFile = File(...),
+    provider: Optional[str] = Query(None, description="LLM Provider (gemini or groq)"),
+    model: Optional[str] = Query(None, description="Model to use")
+):
+    # Validate file size
+    if file.size and file.size > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"File too large. Max size is {settings.MAX_FILE_SIZE_MB}MB")
 
-    file = request.files["file"]
-
+    content = await file.read()
     try:
-        result = process_resume(file)
-        return jsonify({"status": "success", "data": result})
+        result = await process_resume_async(content, file.filename, provider=provider, model=model)
+        return {"status": "success", "data": result}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/parse-batch")
+async def parse_batch(
+    files: List[UploadFile] = File(...),
+    provider: Optional[str] = Query(None, description="LLM Provider (gemini or groq)"),
+    model: Optional[str] = Query(None, description="Model to use")
+):
+    results = []
+    for file in files:
+        content = await file.read()
+        try:
+            result = await process_resume_async(content, file.filename, provider=provider, model=model)
+            results.append({"filename": file.filename, "status": "success", "data": result})
+        except Exception as e:
+            results.append({"filename": file.filename, "status": "error", "message": str(e)})
+    
+    return {"status": "success", "results": results}

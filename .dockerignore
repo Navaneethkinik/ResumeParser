@@ -1,0 +1,14 @@
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.git
+.github
+.vscode
+.env
+requirements.txt
+*.pdf
+*.docx
+*.txt
+!prompts/resume_parser_prompt.txt
