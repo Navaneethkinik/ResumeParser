@@ -146,6 +146,7 @@ export default function App() {
               <select 
                 value={provider} 
                 onChange={(e) => setProvider(e.target.value)}
+                title="Select which AI provider to use for parsing (overrides your environment settings)"
                 style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', color: 'white', outline: 'none' }}
               >
                 <option value="">Default (Settings)</option>
@@ -159,6 +160,7 @@ export default function App() {
               <input 
                 type="text" 
                 placeholder="e.g. gemini-1.5-flash"
+                title="Enter a specific model ID (e.g., gemini-1.5-pro) to override the default"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
                 style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', color: 'white', outline: 'none' }}
@@ -177,6 +179,7 @@ export default function App() {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
+            title="Click to select files from your computer, or drag and drop them here"
             style={{ 
               textAlign: 'center', 
               border: isDragging ? '2px dashed var(--accent-1)' : '2px dashed var(--glass-border)',
@@ -211,7 +214,11 @@ export default function App() {
                     <div key={i} className="animate-fade-in" style={{ background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '12px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', border: '1px solid var(--glass-border)' }}>
                       <File size={14} color="var(--text-secondary)" /> 
                       <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                      <button onClick={() => removeFile(i)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}>
+                      <button 
+                        onClick={() => removeFile(i)} 
+                        title="Remove this file"
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}
+                      >
                         <X size={14} />
                       </button>
                     </div>
@@ -231,6 +238,7 @@ export default function App() {
                       color: 'var(--accent-1)',
                       cursor: 'pointer'
                     }}
+                    title="Add more resumes to the batch"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Plus size={14} /> Add more
@@ -245,6 +253,7 @@ export default function App() {
                   className="btn btn-primary animate-fade-in" 
                   onClick={(e) => { e.stopPropagation(); handleProcess(); }}
                   disabled={isLoading}
+                  title={isLoading ? "Processing files..." : "Upload and analyze all selected resumes"}
                   style={{ padding: '1rem 4rem', fontSize: '1.1rem', borderRadius: '12px' }}
                 >
                   {isLoading ? <><Loader2 className="animate-spin" /> Processing...</> : 'Start AI Analysis'}
@@ -277,12 +286,17 @@ export default function App() {
                   <Database color="var(--accent-2)" /> Extraction Results
                 </h2>                <div style={{ display: 'flex', gap: '0.5rem' }}>
                   {selectedBatchResult && (
-                    <button className="btn" onClick={() => setSelectedBatchResult(null)}>
+                    <button 
+                      className="btn" 
+                      onClick={() => setSelectedBatchResult(null)}
+                      title="Return to the list of all processed resumes"
+                    >
                       Back to List
                     </button>
                   )}
                   <button 
                     className="btn"
+                    title="Download the full extraction data as a JSON file"
                     onClick={() => downloadJson(selectedBatchResult || (batchResults.length > 0 ? batchResults : singleResult), `resume_data_${Date.now()}.json`)}
                   >
                     <Download size={18} /> Export JSON
@@ -438,6 +452,7 @@ export default function App() {
                               <button 
                                 className="btn" 
                                 style={{ padding: '0.4rem', borderRadius: '8px' }}
+                                title="View detailed analysis for this resume"
                                 onClick={() => setSelectedBatchResult(res.data || null)}
                               >
                                 <Eye size={16} />
@@ -446,6 +461,7 @@ export default function App() {
                             <button 
                               className="btn" 
                               style={{ padding: '0.4rem', borderRadius: '8px' }}
+                              title="Download JSON for this resume"
                               onClick={() => downloadJson(res.data, `${res.filename}.json`)}
                             >
                               <Download size={16} />
